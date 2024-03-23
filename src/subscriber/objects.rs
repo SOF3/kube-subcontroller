@@ -43,8 +43,7 @@ where
             ));
             Event {
                 key: QualifiedName::from_resource(&resource),
-                entry: resource,
-                exists: store_value.is_some(),
+                entry: store_value.map(|_| resource),
             }
         })
 }

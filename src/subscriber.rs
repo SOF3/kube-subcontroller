@@ -29,8 +29,7 @@ impl QualifiedName {
 
 pub struct Event<Key, Entry> {
     pub key: Key,
-    pub entry: Entry,
-    pub exists: bool,
+    pub entry: Option<Entry>,
 }
 
 pub mod objects;

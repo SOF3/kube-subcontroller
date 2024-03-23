@@ -16,7 +16,7 @@ pub trait Config {
     /// Subscribe to events indicating subcontroller updates.
     fn subscribe(
         &self,
-    ) -> impl Stream<Item = Result<(Self::TriggerKey, Self::Entry), Self::SubscribeErr>> + Unpin;
+    ) -> impl Stream<Item = Result<Event<Self::TriggerKey, Self::Entry>, Self::SubscribeErr>> + Unpin;
 
     /// The set of subcontrollers
     fn subcontrollers(&self) -> Vec<Box<dyn Subcontroller<Self::TriggerKey, Self::Entry>>>;
@@ -25,11 +25,13 @@ pub trait Config {
 mod subcontroller;
 pub use subcontroller::*;
 
+use crate::subscriber::Event;
+
 type SubcontrollerCtor<TriggerKey, Entry> = dyn Fn() -> Box<dyn Subcontroller<TriggerKey, Entry>>;
 
 pub struct Builder<TriggerKey, Entry, StreamErr, Subscriber, SubscriberFn>
 where
-    Subscriber: Stream<Item = Result<(TriggerKey, Entry), StreamErr>>,
+    Subscriber: Stream<Item = Result<Event<TriggerKey, Entry>, StreamErr>>,
     SubscriberFn: Fn() -> Subscriber,
 {
     subscriber: SubscriberFn,
@@ -39,7 +41,7 @@ where
 impl<TriggerKey, Entry, StreamErr, Subscriber, SubscriberFn>
     Builder<TriggerKey, Entry, StreamErr, Subscriber, SubscriberFn>
 where
-    Subscriber: Stream<Item = Result<(TriggerKey, Entry), StreamErr>>,
+    Subscriber: Stream<Item = Result<Event<TriggerKey, Entry>, StreamErr>>,
     SubscriberFn: Fn() -> Subscriber,
 {
     /// Adds a subcontroller to this config.
@@ -58,7 +60,7 @@ where
     TriggerKey: Clone + Eq + Hash + 'static,
     Entry: 'static,
     StreamErr: 'static,
-    Subscriber: Stream<Item = Result<(TriggerKey, Entry), StreamErr>> + Unpin,
+    Subscriber: Stream<Item = Result<Event<TriggerKey, Entry>, StreamErr>> + Unpin,
     SubscriberFn: Fn() -> Subscriber,
 {
     type TriggerKey = TriggerKey;
@@ -67,7 +69,7 @@ where
 
     fn subscribe(
         &self,
-    ) -> impl Stream<Item = Result<(Self::TriggerKey, Self::Entry), Self::SubscribeErr>> + Unpin
+    ) -> impl Stream<Item = Result<Event<Self::TriggerKey, Self::Entry>, Self::SubscribeErr>> + Unpin
     {
         (self.subscriber)()
     }
@@ -82,7 +84,7 @@ pub fn on<TriggerKey, Entry, StreamErr, Subscriber, SubscriberFn>(
     subscriber: SubscriberFn,
 ) -> Builder<TriggerKey, Entry, StreamErr, Subscriber, SubscriberFn>
 where
-    Subscriber: Stream<Item = Result<(TriggerKey, Entry), StreamErr>>,
+    Subscriber: Stream<Item = Result<Event<TriggerKey, Entry>, StreamErr>>,
     SubscriberFn: Fn() -> Subscriber,
 {
     Builder {

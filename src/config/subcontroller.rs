@@ -9,6 +9,8 @@ use tokio_util::sync::CancellationToken;
 
 pub trait Subcontroller<Key, Entry> {
     fn start(&mut self, key: Key, entry: &Entry);
+
+    fn stop(&mut self, key: Key);
 }
 
 pub struct SubcontrollerBuilder<Key, Entry, Extracted, Run, If, Extract> {
@@ -33,8 +35,8 @@ pub fn subcontroller<Key, Entry, Extracted, Fut, Run, ControllerErr>(
     }
 }
 
-impl<Key, Entry, Extracted, Fut, Run, If, Extract, ControllerErr> Subcontroller<Key, Entry>
-    for SubcontrollerBuilder<Key, Entry, Extracted, Run, If, Extract>
+impl<Key, Entry, Extracted, Fut, Run, If, Extract, ControllerErr>
+    SubcontrollerBuilder<Key, Entry, Extracted, Run, If, Extract>
 where
     Key: Send + Clone + 'static,
     Entry: Send,
@@ -45,12 +47,13 @@ where
     Extracted: Send + 'static,
     ControllerErr: Send + fmt::Debug,
 {
-    fn start(&mut self, key: Key, entry: &Entry) {
+    fn set_task(&mut self, key: Key, entry: Option<&Entry>) {
         let prev = self.current_task.take();
         let cancel = CancellationToken::new();
 
-        let should_run = self.if_fn.call(&key, entry);
-        let extracted = should_run.then(|| self.extract.call(key.clone(), entry));
+        let extracted = entry
+            .filter(|entry| self.if_fn.call(&key, entry))
+            .map(|entry| self.extract.call(key.clone(), entry));
 
         let fut = {
             let cancel = cancel.clone();
@@ -86,6 +89,27 @@ where
             join_handle: handle,
             token: cancel,
         });
+    }
+}
+
+impl<Key, Entry, Extracted, Fut, Run, If, Extract, ControllerErr> Subcontroller<Key, Entry>
+    for SubcontrollerBuilder<Key, Entry, Extracted, Run, If, Extract>
+where
+    Key: Send + Clone + 'static,
+    Entry: Send,
+    Fut: Future<Output = Result<(), ControllerErr>> + Send + 'static,
+    Run: Send + Sync + Fn(CancellationToken, Key, Extract::Extracted) -> Fut + 'static,
+    If: Send + IfFn<Key, Entry>,
+    Extract: Send + ExtractFn<Key, Entry, Extracted = Extracted>,
+    Extracted: Send + 'static,
+    ControllerErr: Send + fmt::Debug,
+{
+    fn start(&mut self, key: Key, entry: &Entry) {
+        self.set_task(key, Some(entry));
+    }
+
+    fn stop(&mut self, key: Key) {
+        self.set_task(key, None);
     }
 }
 

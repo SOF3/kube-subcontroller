@@ -17,24 +17,30 @@ pub async fn run<ConfigT: Config>(config: ConfigT) -> Result<(), RunError<Config
     let mut states = HashMap::<ConfigT::TriggerKey, Handle<ConfigT>>::new();
 
     let mut sub = config.subscribe();
-    while let Some((key, entry)) = sub.try_next().await.map_err(RunError::Subscribe)? {
-        match states.entry(key.clone()) {
-            hash_map::Entry::Vacant(state) => {
-                let mut subcontrollers = config.subcontrollers();
-                for subcontroller in &mut subcontrollers {
-                    subcontroller.start(key.clone(), &entry);
-                }
+    while let Some(event) = sub.try_next().await.map_err(RunError::Subscribe)? {
+        if let Some(entry) = event.entry.as_ref() {
+            match states.entry(event.key.clone()) {
+                hash_map::Entry::Vacant(state) => {
+                    let mut subcontrollers = config.subcontrollers();
+                    for subcontroller in &mut subcontrollers {
+                        subcontroller.start(event.key.clone(), entry);
+                    }
 
-                state.insert(Handle {
-                    subcontrollers,
-                    _ph: PhantomData,
-                });
-            }
-            hash_map::Entry::Occupied(mut state) => {
-                let handle = state.get_mut();
-                for subcontroller in &mut handle.subcontrollers {
-                    subcontroller.start(key.clone(), &entry);
+                    state.insert(Handle {
+                        subcontrollers,
+                        _ph: PhantomData,
+                    });
                 }
+                hash_map::Entry::Occupied(mut state) => {
+                    let handle = state.get_mut();
+                    for subcontroller in &mut handle.subcontrollers {
+                        subcontroller.start(event.key.clone(), entry);
+                    }
+                }
+            }
+        } else if let Some(handle) = states.get_mut(&event.key) {
+            for subcontroller in &mut handle.subcontrollers {
+                subcontroller.stop(event.key.clone());
             }
         }
     }
