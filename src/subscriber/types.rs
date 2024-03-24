@@ -15,7 +15,7 @@ use super::{Event, GroupResource};
 
 pub fn types(
     client: Client,
-) -> impl Stream<Item = Result<Event<GroupResource, ApiResource>, Error>> {
+) -> impl Stream<Item = Result<Event<GroupResource, ApiResource>, Error>> + Unpin {
     async fn flush_groups<E>(
         discovery: &Discovery,
         delivered: &mut HashSet<GroupResource>,
@@ -65,20 +65,20 @@ pub fn types(
             return Ok(Err(err));
         }
 
-        let watcher = crd_client
-            .watch(&WatchParams::default(), "0")
-            .await
-            .map_err(Error::Watch)?;
-        let mut watcher = Box::pin(watcher);
-        while let Some(_event) = watcher.try_next().await.map_err(Error::Watch)? {
-            discovery = discovery.run().await.map_err(Error::Discovery)?;
+        loop {
+            let watcher = crd_client
+                .watch(&WatchParams::default(), "0")
+                .await
+                .map_err(Error::Watch)?;
+            let mut watcher = Box::pin(watcher);
+            while let Some(_event) = watcher.try_next().await.map_err(Error::Watch)? {
+                discovery = discovery.run().await.map_err(Error::Discovery)?;
 
-            if let Err(err) = flush_groups(&discovery, &mut delivered, &mut sink).await {
-                return Ok(Err(err));
+                if let Err(err) = flush_groups(&discovery, &mut delivered, &mut sink).await {
+                    return Ok(Err(err));
+                }
             }
         }
-
-        Ok(Ok(()))
     }
 
     let (mut send, recv) = mpsc::unbounded::<Result<Event<GroupResource, ApiResource>, Error>>();
@@ -95,7 +95,10 @@ pub fn types(
 }
 
 /// The error type returned by [`types`].
+#[derive(Debug, thiserror::Error)]
 pub enum Error {
+    #[error("call discovery API: {0}")]
     Discovery(kube_client::Error),
+    #[error("watch CRD changes: {0}")]
     Watch(kube_client::Error),
 }

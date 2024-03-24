@@ -22,7 +22,7 @@ pub struct SubcontrollerBuilder<Key, Entry, Extracted, Run, If, Extract> {
     _ph: PhantomData<(Key, Entry, Extracted)>,
 }
 
-pub fn subcontroller<Key, Entry, Extracted, Fut, Run, ControllerErr>(
+pub fn subcontroller<Key, Entry, Extracted, Run>(
     run: Run,
 ) -> SubcontrollerBuilder<Key, Entry, Extracted, Run, DefaultIfFn, DefaultExtractFn> {
     SubcontrollerBuilder {

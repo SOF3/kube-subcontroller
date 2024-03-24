@@ -11,7 +11,10 @@
 #![allow(unused_imports)]
 
 pub mod config;
-pub use config::Config;
+pub use config::{on, Config};
 mod runner;
 pub mod subscriber;
 pub use runner::{run, RunError};
+
+#[cfg(test)]
+mod tests;

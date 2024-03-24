@@ -1,17 +1,17 @@
-use std::{hash::Hash, marker::PhantomData, panic};
+use std::{error::Error as StdError, hash::Hash, marker::PhantomData, panic};
 
 use futures::{Future, Stream};
 use tokio::task::JoinHandle;
 use tokio_util::sync::CancellationToken;
 
-/// Parameters for [`run`].
+/// Parameters for [`run`](crate::run).
 pub trait Config {
     /// The type of key used to map an event to its subcontroller set.
     type TriggerKey: Sized + Clone + Eq + Hash + 'static;
     /// The data associated with an event, which can be resolved into parameters for the subcontroller set.
     type Entry: Sized + 'static;
     /// Critical errors during [`subscribe`](Self::subscribe).
-    type SubscribeErr: Sized + 'static;
+    type SubscribeErr: StdError + Sized + 'static;
 
     /// Subscribe to events indicating subcontroller updates.
     fn subscribe(
@@ -59,7 +59,7 @@ impl<TriggerKey, Entry, StreamErr, Subscriber, SubscriberFn> Config
 where
     TriggerKey: Clone + Eq + Hash + 'static,
     Entry: 'static,
-    StreamErr: 'static,
+    StreamErr: StdError + 'static,
     Subscriber: Stream<Item = Result<Event<TriggerKey, Entry>, StreamErr>> + Unpin,
     SubscriberFn: Fn() -> Subscriber,
 {

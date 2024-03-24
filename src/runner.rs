@@ -12,7 +12,7 @@ use crate::config::Subcontroller;
 
 use super::config::Config;
 
-pub async fn run<ConfigT: Config>(config: ConfigT) -> Result<(), RunError<ConfigT>> {
+pub async fn run<ConfigT: Config>(config: ConfigT) -> Result<(), RunError<ConfigT::SubscribeErr>> {
     // TODO delete handle from map when there is no active task
     let mut states = HashMap::<ConfigT::TriggerKey, Handle<ConfigT>>::new();
 
@@ -48,8 +48,10 @@ pub async fn run<ConfigT: Config>(config: ConfigT) -> Result<(), RunError<Config
     Ok(())
 }
 
-pub enum RunError<ConfigT: Config> {
-    Subscribe(ConfigT::SubscribeErr),
+#[derive(Debug, thiserror::Error)]
+pub enum RunError<SubscribeErr> {
+    #[error("subscriber error")]
+    Subscribe(SubscribeErr),
 }
 
 struct Handle<ConfigT: Config> {
