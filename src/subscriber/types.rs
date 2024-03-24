@@ -69,7 +69,7 @@ pub fn types(
             .watch(&WatchParams::default(), "0")
             .await
             .map_err(Error::Watch)?;
-        let mut watcher = pin!(watcher);
+        let mut watcher = Box::pin(watcher);
         while let Some(_event) = watcher.try_next().await.map_err(Error::Watch)? {
             discovery = discovery.run().await.map_err(Error::Discovery)?;
 
